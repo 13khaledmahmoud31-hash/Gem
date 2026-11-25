@@ -1,0 +1,75 @@
+name: Build ZAD APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Generate Android Platform Files Safely
+        run: |
+          mkdir -p /tmp/zad_backup
+          cp pubspec.yaml /tmp/zad_backup/pubspec.yaml
+          cp lib/main.dart /tmp/zad_backup/main.dart
+          flutter create --org com.khaledhassan --project-name zad --platforms=android .
+          cp /tmp/zad_backup/pubspec.yaml pubspec.yaml
+          cp /tmp/zad_backup/main.dart lib/main.dart
+
+      - name: Configure AndroidManifest for ZAD and Phone/WhatsApp
+        run: |
+          python3 -c '
+          import re
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path, "r") as f:
+              content = f.read()
+          content = re.sub(r"android:label=\"[^\"]*\"", "android:label=\"ZAD\"", content, count=1)
+          queries = """    <queries>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="https" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.DIAL" />
+                      <data android:scheme="tel" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="tel" />
+                  </intent>
+              </queries>
+          </manifest>"""
+          if "<queries>" not in content:
+              content = content.replace("</manifest>", queries)
+          with open(path, "w") as f:
+              f.write(content)
+          '
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload ZAD APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZAD-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
