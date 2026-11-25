@@ -33,18 +33,28 @@ jobs:
           cp /tmp/zad_backup/pubspec.yaml pubspec.yaml
           cp /tmp/zad_backup/main.dart lib/main.dart
 
-      - name: Configure AndroidManifest for ZAD and Phone/WhatsApp
+      - name: Configure AndroidManifest for ZAD, WhatsApp and Calls
         run: |
-          python3 -c '
+          python3 - << 'EOF'
           import re
           path = "android/app/src/main/AndroidManifest.xml"
           with open(path, "r") as f:
               content = f.read()
-          content = re.sub(r"android:label=\"[^\"]*\"", "android:label=\"ZAD\"", content, count=1)
+          content = re.sub(r'android:label="[^"]*"', 'android:label="ZAD"', content, count=1)
           queries = """    <queries>
+                  <package android:name="com.whatsapp" />
+                  <package android:name="com.whatsapp.w4b" />
                   <intent>
                       <action android:name="android.intent.action.VIEW" />
                       <data android:scheme="https" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="http" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="whatsapp" />
                   </intent>
                   <intent>
                       <action android:name="android.intent.action.DIAL" />
@@ -60,7 +70,7 @@ jobs:
               content = content.replace("</manifest>", queries)
           with open(path, "w") as f:
               f.write(content)
-          '
+          EOF
 
       - name: Install Dependencies
         run: flutter pub get
